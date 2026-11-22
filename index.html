@@ -51,7 +51,7 @@ button:focus-visible{outline:3px solid var(--f);outline-offset:2px}
 <canvas id="c4"></canvas><div class="row"><button id="p4f">Play your flip</button><button id="p4o" class="ghost">Play original</button><button id="p4a" class="ghost">Play all four</button></div></section>
 
 <section id="s5" class="off"><h2>5. Send it</h2><p class="hint">Exports as MP3, so WhatsApp and most apps can play it.</p>
-<div class="row"><button id="e1">Challenge a friend (backwards clip)</button><button id="e2" class="ghost">All 4 in one MP3</button><button id="e3" class="ghost">All 4 as separate files</button></div></section>
+<div class="row"><button id="e1">Challenge a friend (send your flip)</button><button id="e2" class="ghost">All 4 in one MP3</button><button id="e3" class="ghost">All 4 as separate files</button></div></section>
 <div id="note" role="status"></div>
 </main>
 <script src="lame.min.js"></script>
@@ -133,7 +133,7 @@ $("b1").onclick=()=>record("o");$("b3").onclick=()=>record("a");
 $("p1").onclick=()=>play(S.o);$("p2").onclick=()=>play(S.r);$("p3").onclick=()=>play(S.a);
 $("p4f").onclick=()=>play(S.f);$("p4o").onclick=()=>play(S.o);
 $("p4a").onclick=()=>play(cat([S.o,S.r,S.a,S.f]));
-$("e1").onclick=()=>send([{name:"backwards-challenge.mp3",blob:mp3(S.r)}],"backwards-challenge.zip");
+$("e1").onclick=()=>send([{name:"backwards-challenge.mp3",blob:mp3(S.f)}],"backwards-challenge.zip");
 $("e2").onclick=()=>send([{name:"backwards-all-4.mp3",blob:mp3(cat([S.o,S.r,S.a,S.f]))}],"backwards-all-4.zip");
 $("e3").onclick=()=>send([["1-original",S.o],["2-reversed",S.r],["3-your-attempt",S.a],["4-your-flip",S.f]].map(([n,a])=>({name:n+".mp3",blob:mp3(a)})),"backwards-all-4-files.zip");
 addEventListener("resize",render);
