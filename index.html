@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Backwards</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0f1226">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+:root{--bg:#eef2fb;--panel:#fff;--ink:#14183a;--mute:#5a6088;--line:#d5dbef;--o:#14183a;--f:#ff3d7f;--onink:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1226;--panel:#171b3a;--ink:#eef0ff;--mute:#9aa2cf;--line:#262b52;--o:#8c96ff;--f:#ff5c93;--onink:#0f1226}}
+:root[data-theme="dark"]{--bg:#0f1226;--panel:#171b3a;--ink:#eef0ff;--mute:#9aa2cf;--line:#262b52;--o:#8c96ff;--f:#ff5c93;--onink:#0f1226}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:400 16px/1.5 "Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:560px;margin:0 auto;padding:28px 18px 56px}
+h1{font-size:clamp(44px,13vw,72px);line-height:.95;letter-spacing:-.04em;font-weight:800;margin:0 0 10px}
+.lede{color:var(--mute);margin:0 0 26px;max-width:42ch}
+section{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;margin:0 0 12px;transition:opacity .2s}
+section.off{opacity:.38;pointer-events:none}
+h2{font-size:19px;font-weight:600;margin:0 0 2px;letter-spacing:-.01em}
+.hint{color:var(--mute);font-size:14px;margin:0 0 10px}
+canvas{display:block;width:100%;height:64px;margin:6px 0 12px}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+button{font:600 15px/1 inherit;font-family:inherit;border:0;border-radius:999px;padding:13px 20px;cursor:pointer;background:var(--ink);color:var(--onink)}
+button.ghost{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--line)}
+button.live{background:var(--f);color:#fff;animation:pulse 1s infinite}
+button:disabled{opacity:.4;cursor:default}
+button:focus-visible{outline:3px solid var(--f);outline-offset:2px}
+.key{display:flex;gap:14px;font-size:13px;color:var(--mute);margin:-4px 0 10px}
+.key i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px}
+#note{min-height:22px;color:var(--f);font-size:14px;margin:6px 2px 0}
+@keyframes pulse{50%{opacity:.7}}
+@media (prefers-reduced-motion:reduce){button.live{animation:none}}
+</style></head><body><main>
+<h1>Backwards</h1>
+<p class="lede">Say something. Hear it flipped. Copy what you heard, flip that back, and see how close you get.</p>
+
+<section id="s1"><h2>1. Say it</h2><p class="hint">A short phrase, up to 8 seconds.</p>
+<canvas id="c1"></canvas><div class="row"><button id="b1">Record</button><button id="p1" class="ghost" disabled>Play</button></div></section>
+
+<section id="s2" class="off"><h2>2. Hear it backwards</h2><p class="hint">Listen a few times. Now try to say exactly what you hear.</p>
+<canvas id="c2"></canvas><div class="row"><button id="p2">Play backwards</button></div></section>
+
+<section id="s3" class="off"><h2>3. Say what you heard</h2><p class="hint">Copy the backwards sound as closely as you can.</p>
+<canvas id="c3"></canvas><div class="row"><button id="b3">Record</button><button id="p3" class="ghost" disabled>Play yours</button></div></section>
+
+<section id="s4" class="off"><h2>4. Flip yours back</h2><p class="hint">If you nailed it, this sounds like the original.</p>
+<div class="key"><span><i style="background:var(--o)"></i>Original</span><span><i style="background:var(--f)"></i>Your flip</span></div>
+<canvas id="c4"></canvas><div class="row"><button id="p4f">Play your flip</button><button id="p4o" class="ghost">Play original</button><button id="p4a" class="ghost">Play all four</button></div></section>
+
+<section id="s5" class="off"><h2>5. Send it</h2><p class="hint">Exports as MP3, so WhatsApp and most apps can play it.</p>
+<div class="row"><button id="e1">Challenge a friend (backwards clip)</button><button id="e2" class="ghost">All 4 in one MP3</button><button id="e3" class="ghost">All 4 as separate files</button></div></section>
+<div id="note" role="status"></div>
+</main>
+<script src="lame.min.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const S={o:null,r:null,a:null,f:null};
+let ctx,rec=null,recKey=null,src=null;
+const AC=window.AudioContext||window.webkitAudioContext;
+function ac(){if(!ctx){try{ctx=new AC({sampleRate:44100})}catch(e){ctx=new AC()}}if(ctx.state==="suspended")ctx.resume();return ctx}
+const rev=a=>a.slice().reverse();
+const note=t=>{$("note").textContent=t||""};
+function mono(b){const n=b.numberOfChannels,out=new Float32Array(b.length);for(let c=0;c<n;c++){const d=b.getChannelData(c);for(let i=0;i<out.length;i++)out[i]+=d[i]/n}return out}
+function trim(a){const sr=ac().sampleRate,th=0.02;let s=0,e=a.length-1;while(s<e&&Math.abs(a[s])<th)s++;while(e>s&&Math.abs(a[e])<th)e--;const p=Math.round(sr*0.05);return a.slice(Math.max(0,s-p),Math.min(a.length,e+p+1))}
+
+function draw(cv,list){
+  const dpr=window.devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;if(!w)return;
+  cv.width=w*dpr;cv.height=h*dpr;const g=cv.getContext("2d");g.scale(dpr,dpr);
+  const cs=getComputedStyle(document.documentElement);
+  if(!list.some(l=>l[0])){g.fillStyle=cs.getPropertyValue("--line");g.fillRect(0,h/2-1,w,2);return}
+  list.forEach(([a,col],li)=>{
+    if(!a)return;let pk=0.001;for(let i=0;i<a.length;i+=64)pk=Math.max(pk,Math.abs(a[i]));
+    g.fillStyle=cs.getPropertyValue(col);g.globalAlpha=list.length>1?(li?0.9:0.45):0.9;
+    const step=a.length/w;
+    for(let x=0;x<w;x+=3){let m=0;const s=Math.floor(x*step),e=Math.max(s+1,Math.floor((x+3)*step)),k=Math.max(1,(e-s)>>4);
+      for(let i=s;i<e;i+=k)m=Math.max(m,Math.abs(a[i]||0));
+      const bh=Math.max(3,Math.min(1,m/pk)*h*0.92);g.fillRect(x,(h-bh)/2,2,bh)}
+  });g.globalAlpha=1}
+
+function render(){
+  const L=(k,i,d)=>rec&&recKey===k?"Stop":S[k]?d:i;
+  $("b1").textContent=L("o","Record","Re-record");$("b3").textContent=L("a","Record","Re-record");
+  $("b1").classList.toggle("live",!!rec&&recKey==="o");$("b3").classList.toggle("live",!!rec&&recKey==="a");
+  $("p1").disabled=!S.o;$("p3").disabled=!S.a;
+  $("s2").classList.toggle("off",!S.o);$("s3").classList.toggle("off",!S.o);
+  $("s4").classList.toggle("off",!S.f);$("s5").classList.toggle("off",!S.f);
+  draw($("c1"),[[S.o,"--o"]]);draw($("c2"),[[S.r,"--f"]]);draw($("c3"),[[S.a,"--f"]]);draw($("c4"),[[S.o,"--o"],[S.f,"--f"]]);
+}
+
+async function record(key){
+  if(rec){rec.stop();return}
+  if(!navigator.mediaDevices||!window.MediaRecorder){note("This browser can’t record audio. Try Chrome or Safari.");return}
+  let st;try{st=await navigator.mediaDevices.getUserMedia({audio:true})}catch(e){note("Microphone is blocked. Allow mic access for this page, or open it in its own browser tab, then try again.");return}
+  stopPlay();note("");ac();
+  const chunks=[],r=new MediaRecorder(st),mime=r.mimeType;rec=r;recKey=key;
+  const to=setTimeout(()=>{if(rec===r)r.stop()},8000);
+  r.ondataavailable=e=>e.data.size&&chunks.push(e.data);
+  r.onstop=async()=>{
+    clearTimeout(to);st.getTracks().forEach(t=>t.stop());rec=null;
+    try{const buf=await ac().decodeAudioData(await new Blob(chunks,{type:mime}).arrayBuffer());
+      const t=trim(mono(buf));
+      if(t.length<ac().sampleRate*0.2){note("Didn’t catch anything. Try again a little louder.")}
+      else if(key==="o"){S.o=t;S.r=rev(t);S.a=S.f=null}
+      else{S.a=t;S.f=rev(t)}
+    }catch(e){note("Couldn’t read that recording. Try again.")}
+    render()};
+  r.start();render()}
+
+function stopPlay(){try{src&&src.stop()}catch(e){}src=null}
+function play(a){if(!a)return;stopPlay();const c=ac(),b=c.createBuffer(1,a.length,c.sampleRate);b.copyToChannel(a,0);src=c.createBufferSource();src.buffer=b;src.connect(c.destination);src.start()}
+function cat(list,gap=0.7){const g=Math.round(ac().sampleRate*gap),out=new Float32Array(list.reduce((s,a)=>s+a.length,0)+g*(list.length-1));let p=0;list.forEach(a=>{out.set(a,p);p+=a.length+g});return out}
+
+function mp3(a){
+  let pk=0.001;for(let i=0;i<a.length;i++)pk=Math.max(pk,Math.abs(a[i]));const k=0.9/pk;
+  const i16=new Int16Array(a.length);for(let i=0;i<a.length;i++){const s=Math.max(-1,Math.min(1,a[i]*k));i16[i]=s<0?s*32768:s*32767}
+  const enc=new lamejs.Mp3Encoder(1,ac().sampleRate,128),out=[];
+  for(let i=0;i<i16.length;i+=1152){const b=enc.encodeBuffer(i16.subarray(i,i+1152));if(b.length)out.push(b)}
+  const e=enc.flush();if(e.length)out.push(e);return new Blob(out,{type:"audio/mpeg"})}
+
+async function send(files){
+  note("");
+  try{
+    const fl=files.map(f=>new File([f.blob],f.name,{type:"audio/mpeg"}));
+    if(navigator.canShare&&navigator.canShare({files:fl})){
+      try{await navigator.share({files:fl,title:"Backwards"});return}catch(e){if(e.name==="AbortError")return}}
+    files.forEach((f,i)=>setTimeout(()=>{const a=document.createElement("a");a.href=URL.createObjectURL(f.blob);a.download=f.name;a.click()},i*400));
+  }catch(e){note("Export failed. Try again.")}}
+
+$("b1").onclick=()=>record("o");$("b3").onclick=()=>record("a");
+$("p1").onclick=()=>play(S.o);$("p2").onclick=()=>play(S.r);$("p3").onclick=()=>play(S.a);
+$("p4f").onclick=()=>play(S.f);$("p4o").onclick=()=>play(S.o);
+$("p4a").onclick=()=>play(cat([S.o,S.r,S.a,S.f]));
+$("e1").onclick=()=>send([{name:"backwards-challenge.mp3",blob:mp3(S.r)}],"backwards-challenge.zip");
+$("e2").onclick=()=>send([{name:"backwards-all-4.mp3",blob:mp3(cat([S.o,S.r,S.a,S.f]))}],"backwards-all-4.zip");
+$("e3").onclick=()=>send([["1-original",S.o],["2-reversed",S.r],["3-your-attempt",S.a],["4-your-flip",S.f]].map(([n,a])=>({name:n+".mp3",blob:mp3(a)})),"backwards-all-4-files.zip");
+addEventListener("resize",render);
+matchMedia("(prefers-color-scheme:dark)").addEventListener("change",render);
+render();
+if("serviceWorker"in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+</script></body></html>
